@@ -1,0 +1,216 @@
+// CSCI 3300
+// Assignment: 6b
+// Author:     Evan Walsh
+// File:       huffman.cpp
+// Tab stops:  2
+
+#include <cstdio>
+#include <string>
+#include "pqueue.h"
+#include "binary.h"
+
+using namespace std;
+
+//===================================================================
+//										read 
+//===================================================================
+//read takes in an array of ints and an open file and 
+//reads in the chracters of the file storing their frequency 
+//into the array of ints.
+//===================================================================
+
+void read(int* freq, FILE* inFile)
+{	
+	int ch;  
+	while ((ch = getc(inFile)) != EOF)
+	{
+		freq[ch] += 1;
+	}
+	rewind(inFile);
+}
+
+//===================================================================
+//								printCharacter
+//===================================================================
+//printCharacter prints out the frequency of characters based on the 
+//input array.
+//===================================================================
+void printCharacter(int* p)
+{
+	int letter;
+	for (int i = 0; i < 256; i++)
+	{
+		letter = p[i];
+		if(letter > 0)
+		{	
+			printHelper(i);
+			printf(": %i\n", letter);
+		}	
+	}
+}
+
+//===================================================================
+//								printCode
+//===================================================================
+//printCode prints out the huffman code for the input file.
+//===================================================================
+
+void printCode (string* code)
+{
+	for(int i = 0; i < 256; i++)
+	{
+		if (code[i] != "")
+		{
+			printHelper(i);
+			printf(": %s\n", code[i].c_str());
+		}
+	}
+}
+
+//===================================================================
+//									makeNodes
+//===================================================================
+//makeNodes creates a node for each letter that appears atleast once.
+//===================================================================
+PriorityQueue makeNodes(int* p)
+{
+	PriorityQueue q;
+	char c;
+	int freqLetter;
+	for (int i = 0; i < 256; i++)
+	{
+		c = i;
+		freqLetter = p[i];
+		if (freqLetter > 0)
+		{
+			Node* t = new Node(c);
+			insert(q, t, freqLetter);
+		}
+	}	
+	return q;
+}
+
+//===================================================================
+//									makeTree
+//===================================================================
+//maketree removes nodes from a priority queue and creates a tree.
+//===================================================================
+
+Node* makeTree(int* p)
+{
+	PriorityQueue q;
+	Node* nodefirst; 
+	Node* nodesecond;
+	int first, second;
+	
+	q = makeNodes(p);
+	while (!isEmpty(q))
+	{
+		remove(q, nodefirst, first);
+		if (!isEmpty(q))
+		{
+			remove(q, nodesecond, second);
+  		Node* t = new Node(nodefirst, nodesecond);
+			insert(q, t, first + second);
+		}
+	}
+	return nodefirst;
+}
+
+//===================================================================
+//									fillCodeArray()
+//===================================================================
+//fillcode designates paths to characters adding zeros and ones as 
+//the tree goes down the sub trees.
+//===================================================================
+void fillCodeArray (Node* tree, string* code, string codeString)
+{
+	if (tree -> kind == nonleaf)
+	{
+		fillCodeArray (tree -> left, code, codeString + "0");
+
+		fillCodeArray (tree -> right, code, codeString + "1");
+	}
+	else
+	{
+		code[int (tree -> ch)] = codeString;
+	}
+}
+
+//===================================================================
+//							writeTreeBinary()			
+//===================================================================
+//writeTreeBinary writes the tree to the file.
+//===================================================================
+
+void writeTreeBinary(BFILE* f, Node* t)
+{
+	if (t -> kind == leaf)
+	{
+	  writeBit(f, 1);
+	  writeByte(f, t->ch);
+	}
+	else 
+	{
+		writeBit(f, 0);
+	  writeTreeBinary(f, t->left);
+	  writeTreeBinary(f, t->right);
+	}
+}
+
+//===================================================================
+//							writeCodeFile()
+//===================================================================
+//writeCodeFile writes the code to the file.
+//===================================================================
+
+void writeCodeFile (BFILE* output, string huffcode)
+{
+	for (int i = 0; huffcode[i] != '\0'; i++)
+	{
+		writeBit(output, (huffcode[i]-'0'));
+	}
+}
+
+//===================================================================
+//							Wrompf()
+//===================================================================
+//Wrompf writes a comprressed file.
+//===================================================================
+
+void wrompf(FILE* A, BFILE* B, string* code)
+{
+	int ch;
+	while ((ch = getc(A)) != EOF)
+	{
+		writeCodeFile(B, code[ch]);
+	}
+}
+
+//===================================================================
+//										main()
+//===================================================================
+
+int main(int argc, char* argv[])
+{
+  FILE* file = fopen(argv[1], "r");
+  BFILE* bfile = openBinaryFileWrite(argv[2]);
+	int frequency[256] = {0};
+	string code[256] = {""};	
+	Node* tree;
+	read(frequency, file);
+	printCharacter(frequency);
+	tree = makeTree(frequency);
+	fillCodeArray(tree, code, "");
+	printCode(code);
+	writeTreeBinary(bfile, tree);
+	wrompf(file, bfile, code);
+	fclose(file);
+	closeBinaryFileWrite(bfile);
+  return 0;
+}
+
+
+
+
+
